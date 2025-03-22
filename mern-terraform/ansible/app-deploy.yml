@@ -1,0 +1,34 @@
+---
+- name: Deploy MERN App
+  hosts: web
+  become: yes
+  tasks:
+    - name: Clone MERN App Repository
+      git:
+        repo: "https://github.com/Manjyyot/AnsibleTM.git"
+        dest: "/home/ubuntu/TravelMemory"
+        update: yes
+
+    - name: Install dependencies (npm install --force)
+      shell: |
+        cd /home/ubuntu/TravelMemory
+        npm install --force
+      args:
+        chdir: /home/ubuntu/TravelMemory
+
+    - name: Create .env File for Backend
+      copy:
+        dest: "/home/ubuntu/TravelMemory/.env"
+        content: |
+          MONGO_URI=mongodb://10.0.2.192:27017/travelmemory
+          PORT=3001
+
+    - name: Start MERN App using PM2
+      shell: |
+        pm2 delete TravelMemory || true
+        pm2 start npm --name "TravelMemory" -- start
+      args:
+        chdir: /home/ubuntu/TravelMemory
+
+    - name: Ensure PM2 starts on reboot
+      shell: pm2 startup systemd && pm2 save

@@ -1,0 +1,31 @@
+- name: Harden Security
+  hosts: all
+  become: yes
+  tasks:
+    - name: Disable root login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+
+    - name: Change SSH Port to 2222
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Port'
+        line: 'Port 2222'
+
+    - name: Restart SSH Service
+      service:
+        name: sshd
+        state: restarted
+
+    - name: Set up UFW firewall (Allow SSH, MongoDB, Web Traffic)
+      shell: |
+        ufw allow 2222/tcp
+        ufw allow 80/tcp
+        ufw allow 443/tcp
+        ufw allow 3001/tcp
+        ufw allow from 10.0.2.0/24 to any port 27017
+        ufw enable
+      args:
+        executable: /bin/bash

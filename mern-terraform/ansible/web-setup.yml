@@ -1,0 +1,30 @@
+- name: Web Server Setup
+  hosts: web
+  become: yes
+  tasks:
+    - name: Fix APT package issues before installing Node.js
+      shell: |
+        sudo apt update && sudo apt upgrade -y
+        sudo apt --fix-broken install -y
+        sudo apt autoremove -y
+        sudo apt install -y curl gnupg
+      args:
+        executable: /bin/bash
+
+    - name: Install Node.js and NPM
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+        sudo apt install -y nodejs
+        sudo apt install -y npm
+      args:
+        executable: /bin/bash
+
+    - name: Install Git
+      apt:
+        name: git
+        state: present
+
+    - name: Install PM2 globally
+      npm:
+        name: pm2
+        global: yes
