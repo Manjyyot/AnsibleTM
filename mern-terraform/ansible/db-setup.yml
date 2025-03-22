@@ -1,29 +1,37 @@
-- name: Database Server Setup
+---
+- name: Configure MongoDB on Private Server
   hosts: db
-  become: yes
-  tasks:
-    - name: Fix APT packages before MongoDB installation
-      shell: |
-        sudo apt update && sudo apt upgrade -y
-        sudo apt --fix-broken install -y
-        sudo apt autoremove -y
-      args:
-        executable: /bin/bash
+  become: true
 
+  tasks:
     - name: Install MongoDB
       apt:
         name: mongodb
         state: present
 
-    - name: Start MongoDB Service
+    - name: Ensure MongoDB is running
       service:
         name: mongodb
         state: started
         enabled: yes
 
-    - name: Allow remote MongoDB connections (Security Considerations!)
+    - name: Create MongoDB Admin User
       shell: |
-        sudo sed -i 's/bindIp: 127.0.0.1/bindIp: 0.0.0.0/g' /etc/mongodb.conf
-        sudo systemctl restart mongodb
+        mongo <<EOF
+        use admin
+        db.createUser({user: "admin", pwd: "securepassword", roles:[{role: "userAdminAnyDatabase", db: "admin"}]})
+        EOF
       args:
         executable: /bin/bash
+
+    - name: Enable remote access for MongoDB
+      replace:
+        path: /etc/mongodb.conf
+        regexp: 'bind_ip = 127.0.0.1'
+        replace: 'bind_ip = 0.0.0.0'
+
+    - name: Restart MongoDB
+      service:
+        name: mongodb
+        state: restarted
+
