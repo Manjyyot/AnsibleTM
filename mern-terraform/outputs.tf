@@ -34,3 +34,11 @@ output "db_server_private_ip" {
   description = "Private IP of the Database Server"
   value       = module.ec2.db_server_private_ip
 }
+
+# Export outputs as JSON for Ansible
+output "all_outputs" {
+  value = jsonencode({
+    web_server_public_ip = module.ec2.web_server_public_ip
+    db_server_private_ip = module.ec2.db_server_private_ip
+  })
+}

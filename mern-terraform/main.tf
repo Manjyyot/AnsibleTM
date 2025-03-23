@@ -25,3 +25,11 @@ module "ec2" {
 module "iam" {
   source = "./modules/iam"
 }
+
+resource "local_file" "ansible_inventory" {
+  filename = "${path.module}/inventory.ini"
+  content  = templatefile("${path.module}/inventory.j2", {
+    web_server_public_ip = module.ec2.web_server_public_ip
+    db_server_private_ip = module.ec2.db_server_private_ip
+  })
+}
