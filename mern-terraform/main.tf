@@ -27,9 +27,15 @@ module "iam" {
 }
 
 resource "local_file" "ansible_inventory" {
-  filename = "${path.module}/inventory.ini"
-  content  = templatefile("${path.module}/inventory.j2", {
-    web_server_public_ip = module.ec2.web_server_public_ip
-    db_server_private_ip = module.ec2.db_server_private_ip
-  })
+  filename = "${path.module}/ansible/inventory.ini"
+  content  = <<EOT
+[web]
+web_server ansible_host=${module.ec2.web_server_public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+[db]
+db_server ansible_host=${module.ec2.db_server_private_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -i ~/.ssh/id_rsa ubuntu@${module.ec2.web_server_public_ip}"'
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+EOT
 }
