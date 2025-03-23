@@ -1,3 +1,4 @@
+---
 - name: Deploy MERN App
   hosts: web
   become: true
@@ -5,29 +6,62 @@
     app_dir: /home/ubuntu/TravelMemory
     backend_dir: "{{ app_dir }}/backend"
     frontend_dir: "{{ app_dir }}/frontend"
-    db_host: "10.0.2.29"  # Update with the actual private IP of the database
 
   tasks:
 
     - name: Debug - Start Deployment
       debug:
-        msg: "Starting deployment of the MERN App..."
+        msg: "Starting MERN Stack Deployment..."
 
     - name: Check if Node.js is installed
-      shell: node -v
+      command: node -v
       register: node_version
       ignore_errors: true
+      changed_when: false
+
+    - name: Debug - Node.js Version
+      debug:
+        msg: "Node.js Version Installed: {{ node_version.stdout | default('Not Installed') }}"
 
     - name: Install Node.js and npm if missing
+      block:
+        - name: Add Node.js 18.x repository
+          shell: curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          args:
+            executable: /bin/bash
+
+        - name: Install Node.js and npm
+          apt:
+            name: nodejs
+            state: present
+            update_cache: yes
+      when: "'v' not in node_version.stdout"
+    
+    - name: Ensure npm is installed
+      command: npm -v
+      register: npm_version
+      ignore_errors: true
+      changed_when: false
+
+    - name: Debug - npm Version
+      debug:
+        msg: "npm Version Installed: {{ npm_version.stdout | default('Not Installed') }}"
+
+    - name: Install npm if missing
       apt:
-        name: nodejs
+        name: npm
         state: present
-      when: node_version.rc != 0
+      when: npm_version.rc != 0
 
     - name: Check if PM2 is installed
-      shell: pm2 -v
+      command: pm2 -v
       register: pm2_version
       ignore_errors: true
+      changed_when: false
+
+    - name: Debug - PM2 Version
+      debug:
+        msg: "PM2 Version Installed: {{ pm2_version.stdout | default('Not Installed') }}"
 
     - name: Install PM2 globally if missing
       npm:
@@ -48,23 +82,66 @@
         clone: yes
         update: yes
 
+    - name: Verify package.json exists in backend
+      stat:
+        path: "{{ backend_dir }}/package.json"
+      register: package_json_backend
+
+    - name: Verify package.json exists in frontend
+      stat:
+        path: "{{ frontend_dir }}/package.json"
+      register: package_json_frontend
+
+    - name: Fail if package.json is missing in backend
+      fail:
+        msg: "Backend package.json is missing! Check the repo structure."
+      when: not package_json_backend.stat.exists
+
+    - name: Fail if package.json is missing in frontend
+      fail:
+        msg: "Frontend package.json is missing! Check the repo structure."
+      when: not package_json_frontend.stat.exists
+
     - name: Install dependencies for backend
-      shell: npm install
+      shell: npm install --force
       args:
         chdir: "{{ backend_dir }}"
+      register: npm_backend_output
+
+    - name: Debug - Backend npm Install Output
+      debug:
+        var: npm_backend_output.stdout_lines
 
     - name: Install dependencies for frontend
-      shell: npm install
+      shell: npm install --force
       args:
         chdir: "{{ frontend_dir }}"
+      register: npm_frontend_output
+
+    - name: Debug - Frontend npm Install Output
+      debug:
+        var: npm_frontend_output.stdout_lines
 
     - name: Build frontend (React)
       shell: npm run build
       args:
         chdir: "{{ frontend_dir }}"
+      register: frontend_build_output
+
+    - name: Debug - Frontend Build Output
+      debug:
+        var: frontend_build_output.stdout_lines
 
     - name: Copy frontend build to backend
       shell: cp -r "{{ frontend_dir }}/build" "{{ backend_dir }}/public"
+
+    - name: Fetch Database Private IP from Inventory
+      set_fact:
+        db_host: "{{ hostvars[groups['db'][0]]['ansible_host'] }}"
+
+    - name: Debug - Database Private IP
+      debug:
+        msg: "Using Database IP: {{ db_host }}"
 
     - name: Create .env File for Backend
       copy:
@@ -77,14 +154,17 @@
           CLOUDINARY_API_KEY=your_cloudinary_api_key
           CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 
-    - name: Start MERN App using PM2
-      shell: pm2 start server.js --name "mern-app"
+    - name: Restart MERN App using PM2
+      shell: |
+        pm2 delete TravelMemory || true
+        pm2 start npm --name "TravelMemory" -- start
       args:
         chdir: "{{ backend_dir }}"
+      register: pm2_restart_output
+
+    - name: Debug - PM2 Restart Output
+      debug:
+        var: pm2_restart_output.stdout_lines
 
     - name: Ensure PM2 starts on reboot
       shell: pm2 startup systemd && pm2 save
-
-    - name: Debug - Deployment Completed
-      debug:
-        msg: "MERN App Deployment Completed Successfully!"

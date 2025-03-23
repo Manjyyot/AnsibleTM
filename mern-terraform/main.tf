@@ -30,10 +30,10 @@ resource "local_file" "ansible_inventory" {
   filename = "${path.module}/ansible/inventory.ini"
   content  = <<EOT
 [web]
-web_server ansible_host=${module.ec2.web_server_public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
+web_server ansible_host=${module.ec2.web_server_public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/newManjyyot.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 
 [db]
-db_server ansible_host=${module.ec2.db_server_private_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -i ~/.ssh/id_rsa ubuntu@${module.ec2.web_server_public_ip}"'
+db_server ansible_host=${module.ec2.db_server_private_ip} ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/newManjyyot.pem ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -i /home/ubuntu/newManjyyot.pem ubuntu@${module.ec2.web_server_public_ip}" -o StrictHostKeyChecking=no'
 
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3
