@@ -91,30 +91,6 @@ ansible_python_interpreter=/usr/bin/python3
 ansible-playbook -i inventory.ini ansible/playbook.yml
 
 
-AWS configured properly
-
-
-Terraform Output
-
-
-
-EC2 created after terraform run
-
-
-Security groups associated with the created EC2
-
-
-
-Web Server Ansible:
-Original EC2
-
-
-
-Output after running ansible-playbook
-
-
-
-
 
 
 
