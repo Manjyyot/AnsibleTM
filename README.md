@@ -84,6 +84,37 @@ db_server ansible_host=10.0.2.171 ansible_user=ubuntu ansible_ssh_private_key_fi
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3
 
+
+
 🔹 Deploy MongoDB on the Database Server
 
 ansible-playbook -i inventory.ini ansible/playbook.yml
+
+
+AWS configured properly
+
+
+Terraform Output
+
+
+
+EC2 created after terraform run
+
+
+Security groups associated with the created EC2
+
+
+
+Web Server Ansible:
+Original EC2
+
+
+
+Output after running ansible-playbook
+
+
+
+
+
+
+
