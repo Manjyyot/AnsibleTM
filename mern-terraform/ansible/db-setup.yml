@@ -2,36 +2,93 @@
 - name: Configure MongoDB on Private Server
   hosts: db
   become: true
+  vars:
+    mongo_admin_user: "admin"
+    mongo_admin_password: "securepassword"
+    mongo_port: 27017
+    mongo_bind_ip: "0.0.0.0"
+    ansible_python_interpreter: /usr/bin/python3
 
   tasks:
-    - name: Install MongoDB
+
+    - name: Debug - Start MongoDB Setup
+      debug:
+        msg: "Starting MongoDB Installation and Configuration..."
+
+    - name: Update APT cache and install dependencies
       apt:
-        name: mongodb
-        state: present
+        update_cache: yes
+        name: 
+          - gnupg
+          - curl
+      retries: 3
+      delay: 10
 
-    - name: Ensure MongoDB is running
-      service:
-        name: mongodb
-        state: started
-        enabled: yes
-
-    - name: Create MongoDB Admin User
+    - name: Add MongoDB Official Repository
       shell: |
-        mongo <<EOF
-        use admin
-        db.createUser({user: "admin", pwd: "securepassword", roles:[{role: "userAdminAnyDatabase", db: "admin"}]})
-        EOF
+        curl -fsSL https://pgp.mongodb.com/server-6.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/mongodb-server-keyring.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
       args:
         executable: /bin/bash
 
-    - name: Enable remote access for MongoDB
-      replace:
-        path: /etc/mongodb.conf
-        regexp: 'bind_ip = 127.0.0.1'
-        replace: 'bind_ip = 0.0.0.0'
+    - name: Install MongoDB
+      apt:
+        name: mongodb-org
+        state: present
+        update_cache: yes
 
+    - name: Ensure MongoDB is running and enabled on boot
+      systemd:
+        name: mongod
+        state: started
+        enabled: yes
+
+    - name: Fetch Database Private IP from Inventory
+      set_fact:
+        db_private_ip: "{{ ansible_host }}"
+
+    - name: Debug - MongoDB Private IP
+      debug:
+        msg: "MongoDB is running on private IP: {{ db_private_ip }}"
+
+    - name: Allow remote access for MongoDB
+      lineinfile:
+        path: /etc/mongod.conf
+        regexp: '^( *bindIp:).*'
+        line: '  bindIp: {{ mongo_bind_ip }}'
+      notify: Restart MongoDB
+
+    - name: Check if MongoDB admin user exists
+      shell: |
+        mongo --eval "db.getUser('{{ mongo_admin_user }}')" --quiet admin | grep '"user"' || echo "NOT_FOUND"
+      register: mongo_user_check
+      changed_when: false
+      failed_when: false
+
+    - name: Debug - Check MongoDB User Exists
+      debug:
+        msg: "MongoDB Admin User Status: {{ mongo_user_check.stdout }}"
+
+    - name: Create MongoDB Admin User (Only if missing)
+      shell: |
+        mongo admin --eval "
+        db.createUser({
+          user: '{{ mongo_admin_user }}',
+          pwd: '{{ mongo_admin_password }}',
+          roles: [{ role: 'root', db: 'admin' }]
+        })"
+      when: "'NOT_FOUND' in mongo_user_check.stdout"
+
+    - name: Enable Firewall Rules for MongoDB (Allow only internal network)
+      shell: |
+        ufw allow 27017/tcp comment 'Allow MongoDB from internal network'
+        ufw allow from 10.0.2.0/24 to any port 27017
+        ufw reload
+      args:
+        executable: /bin/bash
+
+  handlers:
     - name: Restart MongoDB
-      service:
-        name: mongodb
+      systemd:
+        name: mongod
         state: restarted
-

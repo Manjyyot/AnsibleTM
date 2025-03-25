@@ -1,0 +1,8 @@
+[web]
+web_server ansible_host={{ web_server_public_ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/newManjyyot.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+[db]
+db_server ansible_host={{ db_server_private_ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/newManjyyot.pem ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -i ~/newManjyyot.pem ubuntu@{{ web_server_public_ip }}" -o StrictHostKeyChecking=no'
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
